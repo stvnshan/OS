@@ -72,6 +72,18 @@ getinterval(time_t s1, uint32_t ns1, time_t s2, uint32_t ns2,
 //
 // Command menu functions 
 
+
+/*
+ * Function that enable the output of debugging messages of type 
+ * DB_THREADS
+ */
+static
+void
+cmd_db_threads(int nargs, char**args){
+	dbflags = DB_THREADS;
+	return;
+}
+
 /*
  * Function for a thread that runs an arbitrary userlevel program by
  * name.
@@ -426,6 +438,7 @@ showmenu(const char *name, const char *x[])
 }
 
 static const char *opsmenu[] = {
+	"[dth]     DB_THREADS                ",
 	"[s]       Shell                     ",
 	"[p]       Other program             ",
 	"[mount]   Mount a filesystem        ",
@@ -536,6 +549,7 @@ static struct {
 	{ "?t",		cmd_testmenu },
 
 	/* operations */
+	{"dth",     cmd_db_threads},
 	{ "s",		cmd_shell },
 	{ "p",		cmd_prog },
 	{ "mount",	cmd_mount },
