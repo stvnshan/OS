@@ -78,10 +78,15 @@ getinterval(time_t s1, uint32_t ns1, time_t s2, uint32_t ns2,
  * DB_THREADS
  */
 static
-void
+int
 cmd_db_threads(int nargs, char**args){
+	(void)args;
+	if (nargs != 1) {
+		kprintf("Usage: s\n");
+		return EINVAL;
+	}
 	dbflags = DB_THREADS;
-	return;
+	return 0;
 }
 
 /*
@@ -425,6 +430,10 @@ showmenu(const char *name, const char *x[])
 		ct++;
 	}
 	half = (ct+1)/2;
+
+	//testing
+	//kprintf("%s\n", "WTF");
+
 
 	for (i=0; i<half; i++) {
 		kprintf("    %-36s", x[i]);
