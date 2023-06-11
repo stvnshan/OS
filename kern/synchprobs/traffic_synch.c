@@ -29,8 +29,18 @@ typedef struct cars{
   Direction destination;
 } car;
 static struct lock *intersection;  
-static struct cv *intersectionCv;
-volatile static struct array *carsAtIntersection;
+// static struct cv *intersectionCv;
+// volatile static struct array *carsAtIntersection;
+
+static struct cv *cv_n;
+static struct cv *cv_s;
+static struct cv *cv_w;
+static struct cv *cv_e;
+static Direction dir;
+
+static int carsWaiting[4];
+static int carsMoving[4];
+
 
 
 /* 
@@ -49,16 +59,36 @@ intersection_sync_init(void)
 
   intersection = lock_create("intersection");
   if (intersection == NULL) {
-    panic("could not create intersection semaphore");
+    panic("could not create intersection lock");
   }
-  intersectionCv = cv_create("intersectionCv");
-  if (intersectionCv == NULL) {
-    panic("could not create intersection condition var");
+  // intersectionCv = cv_create("intersectionCv");
+  // if (intersectionCv == NULL) {
+  //   panic("could not create intersection condition var");
+  // }
+  // carsAtIntersection = array_create();
+  // if (carsAtIntersection == NULL) {
+  //   panic("could not create array");
+  // }
+  cv_n = cv_create("cv_n");
+  if (cv_n == NULL) {
+    panic("could not create cv_n");
   }
-  carsAtIntersection = array_create();
-  if (carsAtIntersection == NULL) {
-    panic("could not create array");
+  cv_s = cv_create("cv_s");
+  if (cv_s == NULL) {
+    panic("could not create cv_s");
   }
+  cv_w = cv_create("cv_w");
+  if (cv_w == NULL) {
+    panic("could not create cv_w");
+  }
+  cv_e = cv_create("cv_e");
+  if (cv_e == NULL) {
+    panic("could not create cv_e");
+  }
+  dir = 5;
+  for(int i = 0;i < 4;i++)  carsWaiting[i] = 0;
+  for(int i = 0;i < 4;i++)  carsMoving[i] = 0;
+  
   return;
 }
 
@@ -74,11 +104,21 @@ intersection_sync_cleanup(void)
 {
   /* replace this default implementation with your own implementation */
   KASSERT(intersection != NULL);
-  KASSERT(intersectionCv != NULL);
-  KASSERT(carsAtIntersection != NULL);
+  // KASSERT(intersectionCv != NULL);
+  // KASSERT(carsAtIntersection != NULL);
+  KASSERT(cv_n != NULL);
+  KASSERT(cv_w != NULL);
+  KASSERT(cv_e != NULL);
+  KASSERT(cv_s != NULL);
   lock_destroy(intersection);
-  cv_destroy(intersectionCv);
-  array_destroy(carsAtIntersection);
+
+  // cv_destroy(intersectionCv);
+  // array_destroy(carsAtIntersection);
+
+  cv_destroy(cv_n);
+  cv_destroy(cv_w);
+  cv_destroy(cv_e);
+  cv_destroy(cv_s);
 }
 
 
@@ -109,19 +149,20 @@ bool if_goright(Direction origin, Direction destination){
 }
 
 
-bool checkConstraints(Direction origin, Direction destination){
-  bool ifR = if_goright(origin,destination);
-  for(unsigned i = 0; i<array_num(carsAtIntersection);i++){
-    car *tmp = array_get(carsAtIntersection,i);
-    if(tmp->origin == origin && tmp->destination == destination) return false;
-    if(tmp->origin == origin) continue;
-    if(tmp->origin == destination && tmp->destination == origin) continue;
-    if(ifR && destination != tmp->destination) continue;
-    if(if_goright(tmp->origin,tmp->destination) && destination != tmp->destination) continue;
-    return false;
-  }
-  return true;
-}
+// bool checkConstraints(Direction origin, Direction destination){
+//   bool ifR = if_goright(origin,destination);
+//   for(unsigned i = 0; i<array_num(carsAtIntersection);i++){
+//     car *tmp = array_get(carsAtIntersection,i);
+//     if(tmp->origin == origin && tmp->destination == destination) return false;
+//     if(tmp->origin == origin) continue;
+//     if(tmp->origin == destination && tmp->destination == origin) continue;
+//     if(ifR && destination != tmp->destination) continue;
+//     if(if_goright(tmp->origin,tmp->destination) && destination != tmp->destination) continue;
+//     return false;
+//   }
+//   return true;
+// }
+
 void
 intersection_before_entry(Direction origin, Direction destination) 
 {
@@ -129,18 +170,73 @@ intersection_before_entry(Direction origin, Direction destination)
   (void)origin;  /* avoid compiler complaint about unused parameter */
   (void)destination; /* avoid compiler complaint about unused parameter */
   KASSERT(intersection != NULL);
-  KASSERT(intersectionCv != NULL);
+  // KASSERT(intersectionCv != NULL);
+  KASSERT(cv_n != NULL);
+  KASSERT(cv_w != NULL);
+  KASSERT(cv_e != NULL);
+  KASSERT(cv_s != NULL);
   
   lock_acquire(intersection);
   
-  while(!checkConstraints(origin,destination)){
-    cv_wait(intersectionCv,intersection);
-  }
+  // while(!checkConstraints(origin,destination)){
+  //   cv_wait(intersectionCv,intersection);
+  // }
   
-  car* c = kmalloc(sizeof(car));
-  c->destination = destination;
-  c->origin = origin;
-  array_add(carsAtIntersection, c ,NULL);
+  // car* c = kmalloc(sizeof(car));
+  // c->destination = destination;
+  // c->origin = origin;
+  // array_add(carsAtIntersection, c ,NULL);
+  if(dir == 5){
+    dir = origin;
+    carsMoving[dir]++;
+  }else if(dir == origin){
+    for(unsigned i = 0;i<4;i++){
+      if(carsMoving[i] > 0 && i != origin){
+        
+        carsWaiting[origin]++;
+        if(origin == north){
+          cv_wait(cv_n,intersection);
+        }else if(origin == south){
+          cv_wait(cv_s,intersection);
+        }else if(origin == west){
+          cv_wait(cv_w,intersection);
+        }else if(origin == east){
+          cv_wait(cv_e,intersection);
+        }
+        while(dir != origin){
+          if(origin == north){
+            cv_wait(cv_n,intersection);
+          }else if(origin == south){
+            cv_wait(cv_s,intersection);
+          }else if(origin == west){
+            cv_wait(cv_w,intersection);
+          }else if(origin == east){
+            cv_wait(cv_e,intersection);
+          }
+        }
+        carsWaiting[origin]--;
+        break;
+      }
+    }
+    
+    carsMoving[dir]++;
+  }else if(dir != origin){
+    carsWaiting[origin]++;
+    while(dir != origin){
+      if(origin == north){
+        cv_wait(cv_n,intersection);
+      }else if(origin == south){
+        cv_wait(cv_s,intersection);
+      }else if(origin == west){
+        cv_wait(cv_w,intersection);
+      }else if(origin == east){
+        cv_wait(cv_e,intersection);
+      }
+    }
+    
+    carsWaiting[origin]--;
+    carsMoving[origin]++;
+  }
   lock_release(intersection);
   return;
 }
@@ -166,19 +262,69 @@ intersection_after_exit(Direction origin, Direction destination)
   // KASSERT(intersectionSem != NULL);
   // V(intersectionSem);
   KASSERT(intersection != NULL);
-  KASSERT(intersectionCv != NULL);
-  KASSERT(array_num(carsAtIntersection) != 0);
+  // KASSERT(intersectionCv != NULL);
+  // KASSERT(array_num(carsAtIntersection) != 0);
+
+  KASSERT(cv_n != NULL);
+  KASSERT(cv_w != NULL);
+  KASSERT(cv_e != NULL);
+  KASSERT(cv_s != NULL);
   lock_acquire(intersection);
-  unsigned index = -1;  
-  for(unsigned i = 0; i < array_num(carsAtIntersection);i++){
-    car *tmp = array_get(carsAtIntersection,i);
-    if(origin == tmp->origin && destination == tmp->destination){
-      index = i;
-      break;
+  // unsigned index = -1;  
+  // for(unsigned i = 0; i < array_num(carsAtIntersection);i++){
+  //   car *tmp = array_get(carsAtIntersection,i);
+  //   if(origin == tmp->origin && destination == tmp->destination){
+  //     index = i;
+  //     break;
+  //   }
+  // }
+  // array_remove(carsAtIntersection,index);
+  // cv_broadcast(intersectionCv,intersection);
+  carsMoving[origin]--;
+  
+  if(dir == origin){
+    int tmp = -1;
+    int dirr;
+    for(unsigned i = 0;i<4;i++){
+      if(i == dir) continue;
+      if(carsWaiting[i] >= tmp){
+        tmp = carsWaiting[i];
+        dirr = i;
+      }
+    }
+    
+    if(tmp == 0 && carsMoving[origin] == 0){
+      dir = 5;
+      
+    }else if(tmp>carsMoving[origin]){
+      dir = dirr;
+      if(carsMoving[origin]==0){
+        if(dir == north){
+          cv_broadcast(cv_n,intersection);
+        }else if(dir == east){
+          cv_broadcast(cv_e,intersection);
+        }else if(dir == west){
+          cv_broadcast(cv_w,intersection);
+        }else if(dir == south){
+          cv_broadcast(cv_s,intersection);
+        }
+      }
+      
+    } 
+  }else if (dir != origin){
+    if(carsMoving[origin] == 0){
+      if(dir == north){
+        cv_broadcast(cv_n,intersection);
+      }else if(dir == east){
+        cv_broadcast(cv_e,intersection);
+      }else if(dir == west){
+        cv_broadcast(cv_w,intersection);
+      }else if(dir == south){
+        cv_broadcast(cv_s,intersection);
+      }
     }
   }
-  array_remove(carsAtIntersection,index);
-  cv_broadcast(intersectionCv,intersection);
+  
   lock_release(intersection);
   return;
 }
