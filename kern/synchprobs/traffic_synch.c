@@ -282,47 +282,54 @@ intersection_after_exit(Direction origin, Direction destination)
   // cv_broadcast(intersectionCv,intersection);
   carsMoving[origin]--;
   
-  if(dir == origin){
-    int tmp = -1;
-    int dirr;
-    for(unsigned i = 0;i<4;i++){
-      if(i == dir) continue;
-      if(carsWaiting[i] >= tmp){
-        tmp = carsWaiting[i];
-        dirr = i;
-      }
-    }
-    
-    if(tmp == 0 && carsMoving[origin] == 0){
-      dir = 5;
-      
-    }else if(tmp>carsMoving[origin]){
-      dir = dirr;
-      if(carsMoving[origin]==0){
-        if(dir == north){
-          cv_broadcast(cv_n,intersection);
-        }else if(dir == east){
-          cv_broadcast(cv_e,intersection);
-        }else if(dir == west){
-          cv_broadcast(cv_w,intersection);
-        }else if(dir == south){
-          cv_broadcast(cv_s,intersection);
-        }
-      }
-      
-    } 
-  }else if (dir != origin){
-    if(carsMoving[origin] == 0){
-      if(dir == north){
-        cv_broadcast(cv_n,intersection);
-      }else if(dir == east){
-        cv_broadcast(cv_e,intersection);
-      }else if(dir == west){
-        cv_broadcast(cv_w,intersection);
-      }else if(dir == south){
-        cv_broadcast(cv_s,intersection);
-      }
-    }
+  if (carsMoving[origin] == 0){
+	if(carsWaiting[0] == 0 && carsWaiting[1] == 0 && carsWaiting[2] == 0 && carsWaiting[3] == 0){
+		dir =5;
+	}else if(origin == north){
+		if(carsWaiting[south] > 0){
+			dir = south;
+			cv_broadcast(cv_s,intersection);
+		}else if(carsWaiting[west] > 0){
+			dir = west;
+			cv_broadcast(cv_w, intersection);
+		}else if(carsWaiting[east]>0){
+			dir = east;
+			cv_broadcast(cv_e, intersection);
+		}
+	}else if(origin == south){
+		if(carsWaiting[west] > 0 ){
+			dir = west;
+			cv_broadcast(cv_w, intersection);
+		}else if(carsWaiting[east] > 0){
+			dir = east;
+			cv_broadcast(cv_e, intersection);
+		}else if(carsWaiting[north] > 0){
+			dir = north;
+			cv_broadcast(cv_n, intersection);
+		}
+	}else if(origin == west){
+		if(carsWaiting[east] > 0){
+			dir = east;
+			cv_broadcast(cv_e, intersection);
+		}else if(carsWaiting[north] > 0){
+			dir = north;
+			cv_broadcast(cv_n, intersection);
+		}else if(carsWaiting[south] > 0){
+			dir = south;
+			cv_broadcast(cv_s, intersection);
+		}
+	}else if(origin == east){
+		if(carsWaiting[north] > 0){
+			dir = north;
+			cv_broadcast(cv_n, intersection);
+		}else if(carsWaiting[south] > 0){
+			dir = south;
+			cv_broadcast(cv_s, intersection);
+		}else if(carsWaiting[west] > 0){
+			dir = west;
+			cv_broadcast(cv_w, intersection);
+		}
+	}
   }
   
   lock_release(intersection);
