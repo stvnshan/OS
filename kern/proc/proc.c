@@ -41,7 +41,7 @@
  * Unless you're implementing multithreaded user processes, the only
  * process that will have more than one thread is the kernel process.
  */
-
+#include "opt-A2.h"
 #include <types.h>
 #include <proc.h>
 #include <current.h>
@@ -49,12 +49,17 @@
 #include <vnode.h>
 #include <vfs.h>
 #include <synch.h>
-#include <kern/fcntl.h>  
-
+#include <kern/fcntl.h> 
+#include <pid_gen.h> 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
 struct proc *kproc;
+
+
+#if OPT_A2
+struct pid_counter *pidCounter;
+#endif
 
 /*
  * Mechanism for making the kernel menu thread sleep while processes are running
@@ -90,6 +95,8 @@ proc_create(const char *name)
 		return NULL;
 	}
 
+
+	proc->pid = pidc_count(pidCounter);
 	threadarray_init(&proc->p_threads);
 	spinlock_init(&proc->p_lock);
 
@@ -193,6 +200,9 @@ proc_destroy(struct proc *proc)
 void
 proc_bootstrap(void)
 {
+#if OPT_A2
+	pidCounter = pidc_create(1);
+#endif
   kproc = proc_create("[kernel]");
   if (kproc == NULL) {
     panic("proc_create for kproc failed\n");

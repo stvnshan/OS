@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
+#include "opt-A2.h"
 #ifndef _PROC_H_
 #define _PROC_H_
 
@@ -58,6 +58,12 @@ struct proc {
 
 	/* VFS */
 	struct vnode *p_cwd;		/* current working directory */
+
+#if OPT_A2
+	pid_t pid;
+	
+#endif /* OPT_A2 */
+
 
 #ifdef UW
   /* a vnode to refer to the console device */
