@@ -50,7 +50,7 @@
 #include <addrspace.h>
 #include <mainbus.h>
 #include <vnode.h>
-
+#include "opt-A2.h"
 #include "opt-synchprobs.h"
 
 

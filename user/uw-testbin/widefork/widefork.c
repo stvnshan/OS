@@ -48,10 +48,12 @@ dowait(int childpid, int childnum)
     return;
   }
   if (WIFEXITED(rval)) {
+    
     if ((WEXITSTATUS(rval)) == childnum) {
       putchar('a'+childnum-1);
       putchar('\n');
     }
+    
   }
   else {
     putchar('x');

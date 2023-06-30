@@ -35,7 +35,10 @@
 #include <thread.h>
 #include <current.h>
 #include <syscall.h>
-
+#include <proc.h>
+#include <addrspace.h>
+#include "opt-A2.h"
+//#include <trapframe.h>
 
 /*
  * System call dispatcher.
@@ -108,6 +111,7 @@ syscall(struct trapframe *tf)
 		err = sys___time((userptr_t)tf->tf_a0,
 				 (userptr_t)tf->tf_a1);
 		break;
+
 #ifdef UW
 	case SYS_write:
 	  err = sys_write((int)tf->tf_a0,
@@ -131,7 +135,13 @@ syscall(struct trapframe *tf)
 	  break;
 #endif // UW
 
-	    /* Add stuff here */
+#if OPT_A2
+	case SYS_fork:
+		err = sys_fork(tf,&retval);
+		break;
+
+#endif /* OPT_A2 */
+	
  
 	default:
 	  kprintf("Unknown syscall %d\n", callno);
@@ -177,7 +187,22 @@ syscall(struct trapframe *tf)
  * Thus, you can trash it and do things another way if you prefer.
  */
 void
-enter_forked_process(struct trapframe *tf)
+enter_forked_process(void *tf,unsigned long data2)
 {
 	(void)tf;
+#if OPT_A2
+	struct trapframe *tff = tf;
+	struct trapframe tf_c = *tff;
+	data2 = data2;// get rid of warning
+	tf_c.tf_v0 = 0; // return code for child
+	tf_c.tf_a3 = 0; // no error
+	tf_c.tf_epc += 4; // increment pc
+
+	curproc_setas((struct addrspace *) data2);
+    as_activate();
+	mips_usermode (&tf_c); // return to usermode
+
+#endif /* OPT_A2 */
+
+
 }

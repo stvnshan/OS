@@ -50,7 +50,7 @@
 #include <vfs.h>
 #include <synch.h>
 #include <kern/fcntl.h> 
-#include <pid_gen.h> 
+#include <array.h>
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
@@ -58,7 +58,8 @@ struct proc *kproc;
 
 
 #if OPT_A2
-struct pid_counter *pidCounter;
+static volatile pid_t pid_c;
+static struct lock *pid_c_lk;
 #endif
 
 /*
@@ -95,17 +96,33 @@ proc_create(const char *name)
 		return NULL;
 	}
 
-
-	proc->pid = pidc_count(pidCounter);
+#if OPT_A2
+	if(name == "[kernel]"){
+		proc->pid = pid_c;
+		pid_c++;
+	}else{
+		lock_acquire(pid_c_lk);
+		proc->pid = pid_c;
+		pid_c++;
+		lock_release(pid_c_lk);
+	}
 	threadarray_init(&proc->p_threads);
 	spinlock_init(&proc->p_lock);
-
+	proc->children_info = array_create();
+	proc->children = array_create();
+	
+#endif
 	/* VM fields */
 	proc->p_addrspace = NULL;
 
 	/* VFS fields */
 	proc->p_cwd = NULL;
-
+#if OPT_A2
+	proc->exit = false;
+	proc->exitcode = -1;
+	proc->wait_child = cv_create("wait_child");
+	proc->wait_child_lock = lock_create("wait_child_lock");
+#endif
 #ifdef UW
 	proc->console = NULL;
 #endif // UW
@@ -169,13 +186,30 @@ proc_destroy(struct proc *proc)
 	  vfs_close(proc->console);
 	}
 #endif // UW
-
+#if OPT_A2
+	//lock_acquire(proc->wait_child_lock);
+    for (int i = array_num(proc->children) - 1; i >= 0; i--) {
+		struct proc *child = array_get(proc->children,i);
+		if(child){
+			child->parent = NULL;
+		}
+    	array_remove(proc->children, i);
+    } 
+    array_cleanup(proc->children);
+	//lock_release(proc->wait_child_lock);
+	for (int i = array_num(proc->children_info) - 1; i >= 0; i--) {
+		array_remove(proc->children_info, i);
+    } 
+    array_cleanup(proc->children_info);
+	cv_destroy(proc->wait_child);
+	lock_destroy(proc->wait_child_lock);
+#endif
 	threadarray_cleanup(&proc->p_threads);
 	spinlock_cleanup(&proc->p_lock);
-
 	kfree(proc->p_name);
 	kfree(proc);
-
+	
+	
 #ifdef UW
 	/* decrement the process count */
         /* note: kproc is not included in the process count, but proc_destroy
@@ -201,7 +235,8 @@ void
 proc_bootstrap(void)
 {
 #if OPT_A2
-	pidCounter = pidc_create(1);
+	pid_c_lk = lock_create("pid_c_lk");
+	pid_c = 1;
 #endif
   kproc = proc_create("[kernel]");
   if (kproc == NULL) {

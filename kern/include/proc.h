@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 #include "opt-A2.h"
+
 #ifndef _PROC_H_
 #define _PROC_H_
 
@@ -38,13 +39,26 @@
 
 #include <spinlock.h>
 #include <thread.h> /* required for struct threadarray */
-
+#include <array.h>
+#include <synch.h>
 struct addrspace;
 struct vnode;
 #ifdef UW
 struct semaphore;
 #endif // UW
 
+
+
+
+#if OPT_A2
+struct proc_info
+{
+	pid_t pid;
+	int exitcode;
+	bool exit;
+
+};
+#endif /* OPT_A2 */
 /*
  * Process structure.
  */
@@ -61,7 +75,13 @@ struct proc {
 
 #if OPT_A2
 	pid_t pid;
-	
+	struct proc *parent;
+	struct array *children;
+	struct array *children_info;
+	bool exit;
+	int exitcode;
+	struct cv *wait_child;
+	struct lock *wait_child_lock;
 #endif /* OPT_A2 */
 
 
@@ -76,6 +96,8 @@ struct proc {
 
 	/* add more material here as needed */
 };
+
+
 
 /* This is the process structure for the kernel and for kernel-only threads. */
 extern struct proc *kproc;
