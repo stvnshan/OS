@@ -13,9 +13,135 @@
 #include <types.h>
 #include <kern/errno.h>
 #include "opt-A2.h"
+#include <kern/limits.h>
+#include <vfs.h>
+#include <kern/fcntl.h>
+#include <array.h>
 
 
 #if OPT_A2
+int
+sys_execv(userptr_t progname, userptr_t args)
+{
+
+	struct addrspace *as;
+	struct vnode *v;
+	vaddr_t entrypoint, stackptr;
+	int result;
+
+  // copy in grogram name
+  size_t pName_size = strlen((char *)progname)+1 ;
+  char* pName_kernel = kmalloc(pName_size * sizeof(char));
+  KASSERT(pName_kernel != NULL);
+  result = copyinstr(progname,pName_kernel,pName_size,NULL);
+  if(result){
+    return result;
+  }
+ 
+
+  //copy in char pointer values
+  char *arg_ptr;
+  int argc = 0;
+  do
+  {
+    copyin(args + argc*sizeof(char*), &arg_ptr,sizeof(char*));
+    argc++;
+   
+  } while (arg_ptr != NULL);
+  argc--;
+ 
+  char **argv = kmalloc((argc+1)*sizeof(char*)); 
+  
+
+  for(int i = 0; i < argc ; i ++){
+  
+    copyin(args + i*sizeof(char*), &arg_ptr, sizeof(char*));
+  
+    argv[i] = kmalloc((strlen(arg_ptr) + 1) * sizeof(char));
+  
+    result = copyinstr((userptr_t)arg_ptr,argv[i], strlen(arg_ptr) + 1 , NULL);  
+    if(result){
+      return result;
+    }
+
+
+  }
+  argv[argc] = NULL;
+  //array_cleanup(arg_ptr_array);
+
+	/* Open the file. */
+	result = vfs_open(pName_kernel, O_RDONLY, 0, &v);
+	if (result) {
+		return result;
+	}
+
+	/* We should be a new process. */
+	//KASSERT(curproc_getas() == NULL);
+
+	/* Create a new address space. */
+	as = as_create();
+	if (as ==NULL) {
+		vfs_close(v);
+		return ENOMEM;
+	}
+
+	/* Switch to it and activate it. */
+	struct addrspace * as_old = curproc_setas(as);
+	as_activate();
+
+	/* Load the executable. */
+	result = load_elf(v, &entrypoint);
+	if (result) {
+		/* p_addrspace will go away when curproc is destroyed */
+		vfs_close(v);
+		return result;
+	}
+
+
+	/* Done with the file now. */
+	vfs_close(v);
+
+	/* Define the user stack in the address space */
+	result = as_define_stack(as, &stackptr);
+	if (result) {
+		/* p_addrspace will go away when curproc is destroyed */
+		return result;
+	}
+
+//copy agrs from kern to new address space
+
+  vaddr_t *stack_arg_ptr = kmalloc((argc+1) * sizeof(vaddr_t));
+  stack_arg_ptr[argc] = (vaddr_t)NULL;
+  for(int i = argc - 1; i >= 0; i-- ){
+    int argL = ROUNDUP(strlen(argv[i]) + 1, 4);
+    stackptr -= argL;
+    result = copyoutstr(argv[i],(userptr_t)stackptr , strlen(argv[i]) + 1,NULL);
+    if(result){
+      return result;
+    }
+    stack_arg_ptr[i] = stackptr;
+  }
+
+  for(int i = argc ; i >= 0; i--){
+    int argL = ROUNDUP(sizeof(vaddr_t), 4);
+    stackptr -= argL;
+    result = copyout((void*)&stack_arg_ptr[i], (userptr_t)stackptr, sizeof(vaddr_t));
+    if(result){
+      return result;
+    }
+
+  }
+  
+  as_destroy(as_old);
+	/* Warp to user mode. */
+  
+	enter_new_process(argc /*argc*/, (userptr_t)stackptr /*userspace addr of argv*/,
+			  stackptr, entrypoint);
+	
+	/* enter_new_process does not return. */
+	panic("enter_new_process returned\n");
+	return EINVAL;
+}
 
 int sys_fork(struct trapframe *tf,int* resval){
   //create a process structure for child process

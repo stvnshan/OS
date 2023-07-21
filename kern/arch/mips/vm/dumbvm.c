@@ -37,7 +37,7 @@
 #include <mips/tlb.h>
 #include <addrspace.h>
 #include <vm.h>
-
+#include "opt-A3.h"
 /*
  * Dumb MIPS-only "VM system" that is intended to only be just barely
  * enough to struggle off the ground.
@@ -104,6 +104,7 @@ vm_tlbshootdown(const struct tlbshootdown *ts)
 	panic("dumbvm tried to do tlb shootdown?!\n");
 }
 
+//#if OPT_A3
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
 {
@@ -155,6 +156,14 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 	KASSERT(as->as_pbase2 != 0);
 	KASSERT(as->as_npages2 != 0);
 	KASSERT(as->as_stackpbase != 0);
+	// if((as->as_vbase1 & PAGE_FRAME) != as->as_vbase1){
+	// 	kprintf("problem:::\n");
+	// 	kprintf("%d",as->as_vbase1 & PAGE_FRAME);
+	// 	kprintf("\n");
+	// 	kprintf("%d",as->as_vbase1);
+	// 	kprintf("\n");
+	// }
+	
 	KASSERT((as->as_vbase1 & PAGE_FRAME) == as->as_vbase1);
 	KASSERT((as->as_pbase1 & PAGE_FRAME) == as->as_pbase1);
 	KASSERT((as->as_vbase2 & PAGE_FRAME) == as->as_vbase2);
@@ -199,11 +208,19 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 		splx(spl);
 		return 0;
 	}
+	//if OPT-A3
+	ehi = faultaddress;
+	elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
+	tlb_random(ehi,elo);
+	//splx(spl);
+	return 0;
+	//endif
 
 	kprintf("dumbvm: Ran out of TLB entries - cannot handle page fault\n");
 	splx(spl);
 	return EFAULT;
 }
+//#endif
 
 struct addrspace *
 as_create(void)

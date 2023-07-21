@@ -383,7 +383,7 @@ mips_usermode(struct trapframe *tf)
 	 */
 	spl0();
 	cpu_irqoff();
-
+	
 	cputhreads[curcpu->c_number] = (vaddr_t)curthread;
 	cpustacks[curcpu->c_number] = (vaddr_t)curthread->t_stack + STACK_SIZE;
 
@@ -407,7 +407,9 @@ mips_usermode(struct trapframe *tf)
 	/*
 	 * This actually does it. See exception.S.
 	 */
+	
 	asm_usermode(tf);
+	
 }
 
 /*
@@ -435,5 +437,7 @@ enter_new_process(int argc, userptr_t argv, vaddr_t stack, vaddr_t entry)
 	tf.tf_a1 = (vaddr_t)argv;
 	tf.tf_sp = stack;
 
+	
 	mips_usermode(&tf);
+	
 }

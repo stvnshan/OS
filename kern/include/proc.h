@@ -41,6 +41,7 @@
 #include <thread.h> /* required for struct threadarray */
 #include <array.h>
 #include <synch.h>
+#include <array.h>
 struct addrspace;
 struct vnode;
 #ifdef UW
